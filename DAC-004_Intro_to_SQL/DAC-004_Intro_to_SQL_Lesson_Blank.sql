@@ -200,38 +200,82 @@ GROUP BY gender;
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- All the AGGREGATES!
+SELECT 
+	gender, 
+	COUNT(*) AS HeadCount,
+	COUNT (DISTINCT jobtitle)AS UNIQUEJOBTITLES, 
+	SUM(vacationhours) AS total_vacation_hours,
+	AVG (vacationhours) AS average_vacation_hours,
+	CEILING (AVG(vacationhours)) AS ceiling_vacation_hours,
+	FLOOR(AVG(vacationhours)) AS floor_vacation_hours,
+	ROUND (AVG(vacationhours)) AS rounded_average,
 
+	MIN (sickleavehours) AS max_sick_leave_hours,
+	MAX (sickleavehours) AS min_sick_leave_hours
+FROM humanresources.employee
+GROUP BY gender;
 
 
 -- Q2: Analyse if the marital status of each gender affects the number of vacation hours one will take
 -- A2:
+SELECT 
+	gender, 
+	maritalstatus, 
+	AVG(vacationhours) AS average_vacation_hours
+FROM humanresources.employee
+GROUP BY 1,2;
 
 
 -- From employee table, ORDER BY hiredate, ASC and DESC
 
 -- hiredate earliest
-
+SELECT * 
+FROM humanresources.employee
+ORDER BY hiredate ASC;
 
 -- hiredate latest
-
+SELECT * 
+FROM humanresources.employee
+ORDER BY hiredate DESC;
 
 -- Sort table using two or more values
+SELECT 
+	jobtitle,
+	gender
+FROM humanresources.employee
+ORDER BY jobtitle ASC, gender ASC; 
 
 
 -- Sorting by Average
-
-
+SELECT 
+	jobtitle,
+	AVG(vacationhours) AS avg_vacay_hours
+FROM humanresources.employee
+GROUP BY jobtitle
+ORDER BY AVG(vacationhours) DESC;
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- HAVING clause:
-
+SELECT 
+	jobtitle,
+	AVG(sickleavehours) AS average_sick_leave_hours
+FROM humanresources.employee
+GROUP BY jobtitle
+HAVING AVG(sickleavehours) > 50;
+	
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- Q3: From the customer table, where customer has a personid and a storeid, find the territory that has higher than 40 customers
 -- A3:
-
-
+SELECT 
+	territoryid,
+	COUNT(*) AS number_of_customers
+FROM sales.customer
+WHERE personid IS NOT NULL 
+	AND storeid IS NOT NULL
+GROUP BY territoryid
+HAVING COUNT (*) >40
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -240,6 +284,10 @@ SELECT *
 FROM humanresources.employee
 ORDER BY birthdate ASC;
 
+SELECT *
+FROM humanresources.employee
+ORDER BY birthdate ASC
+OFFSET 10;
 
 
 -- Q4: From the salesperson table, where customer has a personid and a storeid, find the territory that has higher than 40 customers
@@ -256,12 +304,15 @@ ORDER BY birthdate ASC;
 	3) So people don't think you are a noob
 */
 
-
+SELECT *
+FROM humanresources.employee
+WHERE gender = 'M'
+LIMIT 10; 
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- JOINS: INNER
-
+-- left join is usually used for debugging 
 -- Inner join to get product information along with its subcategory name and category name
 
 SELECT *
@@ -273,8 +324,17 @@ FROM production.productsubcategory;
 SELECT *
 FROM production.productcategory;
 
-
-
+SELECT
+	product.productid,
+	product.name AS product_name ,
+	prodcutcategory.name AS category_name,
+	productsubcategory.name AS subcategory_name 
+FROM production.product AS product --left table 
+INNER JOIN production.productsubcategory AS productsubcategory  --right table 
+	ON product.productsubcategoryid= productsubcategory.productsubcategoryid;
+INNER JOIN production.productcategory AS productcategory
+	ON productsubcategory.productcategoryid = productcategory.productioncategoryid;
+--INNER JOIN 
 -- Let's create a base table in the humanresources schema, where we are able to get each employee's department history and department name
 
 -- Employee table
@@ -318,12 +378,41 @@ FROM production.product;
 SELECT *
 FROM sales.salesorderdetail;
 
-
+SELECT 
+	product.productid, 
+	product.name AS productname,
+	COALESCE(SUM(salesorderdetail.orderqty), 0) AS totalsalesquantity
+FROM production.product AS product 
+LEFT JOIN sales.salesorderdetail AS salesorderdetail 
+	ON product.productid = salesorderdetail.productid
+GROUP BY 
+	product.productid,
+	product.name
+ORDER BY 
+	COALESCE(SUM(salesorderdetail.orderqty), 0) DESC;
 
 -- Q5: List all employees and their associated email addresses,  
 -- display their full name and email address.
 
+SELECT *
+FROM humanresources.employee;
 
+SELECT * 
+FROM person.person;
+
+SELECT * 
+FROM person.emailaddresses;
+
+SELECT 
+	CONCAT(person.firstname,' ', person.middlename,' ', person.lastname) AS fullname,
+	emailaddress.emailaddress AS email
+FROM humanresources.employee as employee 
+LEFT JOIN person.person as person 
+	ON employee.businessentityid = person.businessentityid
+LEFT JOIN person.emailaddress AS emailaddress 
+	ON employee.businessentityid = person.businessentityid;
+	
+	
 -- Retrieve a list of all individual customers id, firstname along with the total number of orders they have placed 
 -- and the total amount they have spent, removing customers who have never placed an order. 
 
@@ -336,11 +425,29 @@ FROM sales.customer;
 SELECT *
 FROM sales.salesorderheader;
 
-
+SELECT 
+	customer.customerid, 
+	person.firstname,
+	COUNT(salesorderid) AS purchases,
+	ROUND(SUM (subtotal),2) AS cost 
+FROM sales.customer AS customer 
+LEFT JOIN person.person AS person 
+	ON customer.personid = person.businessentityid
+LEFT JOIN sales.salesorderheader AS salesorderheader
+	ON customer.customerid = salesorderheader.customerid
+GROUP BY 
+	customer.customerid, 
+	person.firstname
+HAVING ROUND (SUM(subtotal),2) IS NOT NULL 
+	
 
 -- Q6: Can LEFT JOIN cause duplication? How?
 -- A6: 
-
+\*
+--It depends on the relationship that the sakes present for the left join share 
+-- if it is a one yt one relationshop the chance of having duplicates is unlikely 
+-- However, if it is a oen to many relationships there could be a chance for the duplicates to be present 
+*/
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- JOINS: RIGHT
@@ -352,7 +459,25 @@ SELECT
     salesorderheader.orderdate AS orderdate, 
     customer.customerid AS customerid, 
     customer.personid AS personid
+FROM sales.salesorderheader AS salesorderheader;
+
+SELECT 
+    salesorderheader.salesorderid AS salesorderid, 
+    salesorderheader.orderdate AS orderdate,
+	customer.customerid AS customerid,
+	customer.personid AS personid
 FROM sales.salesorderheader AS salesorderheader
+RIGHT JOIN sales.customer AS customer 
+	ON sales.salesorderheader.customerid = customer.custoemrid;
+
+
+SELECT * 
+FROM sales.salesorderheader AS salesorderheader
+LIMIT 10; 
+
+SELECT *
+FROM sales.customer 
+LIMIT 10;
 
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -366,8 +491,19 @@ SELECT
     employee.businessentityid AS employeeid,
     salesorderheader.salesorderid
 FROM humanresources.employee AS employee
+FULL OUTER JOIN sales.salesorderheader AS salesorderheader
+	ON employee.businessentityid = salesorderheader.salespersonid; 
 
-		
+
+Select * 
+from humanresources.employee
+limit 10; 
+
+select * 
+from sales.salesorderheader
+limit 10; 
+
+
 -- Write a query to retrieve a list of all employees and customers, and if either side doesn't have a FirstName, 
 -- use the available value from the other side. Use FULL OUTER JOIN and COALESCE.
 
@@ -401,6 +537,20 @@ SELECT
 
 FROM production.productcategory AS productcategory
 
+SELECT 
+FROM production.productcategory AS productcategory 
+LIMIT 10; 
+
+SELECT 
+FROM production.productmodel AS productmodel 
+LImit 10; 
+
+
+SELECT 
+	productcategory.name as categoryname,
+	productmodel.name as modelname
+FROM production.productcategory AS productcategory 
+CROSS JOIN production.productmodel AS productmodel; 
 
 -- Each category name is matched to each model name
 
@@ -418,7 +568,26 @@ FROM person.person;
 SELECT *
 FROM sales.customer;
 
+SELECT
+	firstname, 
+	lastname, 
+	CONCAT (firstname, ' ', middlename, ' ', lastname) AS fullname, 
+	'Employee' as category 
+FROM person.person AS person
+INNER JOIN humanresources.employee as employee 
+	ON person.businessentityid = employee.businessentityid
+	
+UNION	
 
+SELECT 
+	firstname, 
+	lastname, 
+	CONCAT (firstname, ' ', middlename, ' ', lastname) AS fullname, 
+	'Customer' as category 
+FROM person.person AS person 
+INNER JOIN sales.customer AS customer
+	ON person.businessentityid = customer.personid
+WHERE customer.storeid IS NULL;
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -448,33 +617,75 @@ FROM purchasing.purchaseorderheader;
 -- Getting parts of the date out
 
 SELECT 
+	EXTRACT(YEAR FROM orderdate) as year,
+	EXTRACT(QUARTER FROM orderdate) as QUARTER,
+	EXTRACT(MONTH FROM orderdate) as MONTH,
+	EXTRACT(WEEK FROM orderdate) as WEEK, 
+	EXTRACT(DAY FROM orderdate) as DAY,
+	EXTRACT(HOUR FROM orderdate) as HOUR,
+	EXTRACT(MINUTE FROM orderdate) as MINUTE,
+	EXTRACT(SECOND FROM orderdate) as SECOND,
+	CAST (orderdate as time) as time,
+	CAST (orderdate as DATE) as  date
+FROM sales.salesorderheader
+LIMIT 10;
 
-FROM sales.salesorderheader;
 
 -- DATETIME manipulations
 
 SELECT
-
+	orderdate AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Singapore' as local_time, 
+	CURRENT_DATE AS today,
+	CURRENT_DATE + INTERVAL '10 days' as add_days,
+	CURRENT_DATE - INTERVAL '10 days' as minus_days,
+	CURRENT_DATE + INTERVAL '1 month' as add_month
 FROM sales.salesorderheader
 WHERE territoryid = 1
 	AND EXTRACT(YEAR FROM orderdate) = 2011;
 
 -- Use string functions to format employee names and email addresses
 SELECT
+	CAST(person.businessentityid AS int),
+	CAST(person.businessentityid AS numeric)/2 AS numeric_id,
+	CAST(person.businessentityid AS decimal)/2 AS decimal_id,
+	CAST(person.businessentityid AS VARCHAR(100)) AS varchar_id,
 
+	UPPER(person.lastname) as upperlastname, 
+	LOWER(person.lastname) as lowerlastname, 
+	LENGTH(person.firstname) as firstnamelength,
+
+	LEFT(emailaddress.emailaddress, 10) as startemail,
+	RIGHT (emailaddress.emailaddress, 10) as endemail, 
+	SUBSTRING (emailaddress.emailaddress,1,5) AS partialemail,
+	SUBSTRING (emailaddress.emailaddress,3,5) AS partialemail, 
+	emailaddress.emailaddress as old_email,
+	REPLACE (emailaddress.emailaddress, '@adventure-works.com', '@gmail.com') AS new_mail
 FROM person.person AS person
+INNER JOIN person.emailaddress AS emailaddress 
+	ON person.businessentityid = emailaddress.businessentityid 
 
+/* 
+CAST()
+UPPER()
+LOWER()
+LENGTH()
+LEFT()
+RIGHT()
+SUBSTRING()
+REPLACE ()
+CONCAT()
+*/
 
 -- From the following table write a query in  SQL to find the  email addresses of employees and groups them by city. 
 -- Return top ten rows.
 
 SELECT 
-	address.city, 
-
+	address.city 
 FROM person.businessentityaddress AS businessentityaddress  
-
 GROUP BY 
 LIMIT 10;
+
+--STRING AGG ()
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
